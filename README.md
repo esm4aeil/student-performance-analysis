@@ -33,7 +33,7 @@ The target variable is created from the final grade (G3):
 - 1: Pass (G3 >= 10)
 - 0: Fail (G3 < 10)
 
-The grade-related columns G1, G2, and G3 are excluded from the input features to avoid using previous or final grades as predictors.
+The original grade columns G1 and G2 are excluded from the input features to prevent data leakage. G3 is used only to create the target variable and is not included as a predictor.
 
 ## Data Analysis
 
@@ -85,9 +85,12 @@ Special attention was given to recall for the Fail class because identifying stu
 
 | Model | Accuracy | Fail Recall | Fail Precision | Fail F1 |
 |---|---:|---:|---:|---:|
+| Dummy Classifier (Baseline) | 67.09% | 0.00% | — | 0.00% |
 | Logistic Regression | 65.82% | 34.62% | 47.37% | 40.00% |
 | Balanced Logistic Regression | 59.49% | 46.15% | 40.00% | 43.00% |
 | Tuned Decision Tree | 65.82% | 34.62% | 47.37% | 40.00% |
+
+The Dummy Classifier achieved 67.09% accuracy by predicting every student as Pass. However, it failed to identify any students who actually failed. This demonstrates why accuracy alone can be misleading when evaluating imbalanced classification problems.
 
 The Balanced Logistic Regression model achieved the highest recall for the Fail class, identifying more students who actually failed.
 
