@@ -1,709 +1,535 @@
-import pandas as pd
+"""Student performance analysis: exploratory analysis and pass/fail models.
+
+Run from the project root:
+    python notebooks/test.py
+"""
+
 from pathlib import Path
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_score, StratifiedKFold
-
-# ==========================================
-# 1. Load Dataset
-# ==========================================
-
-project_path = Path(__file__).resolve().parent.parent
-data_path = project_path / "data" / "student-mat.csv"
-
-df = pd.read_csv(data_path, sep=";")
-
-print("First 5 Rows:")
-print(df.head())
-
-print("\nDataset Shape:")
-print(df.shape)
-
-print("\nColumn Names:")
-print(df.columns.tolist())
-
-print("\nDataset Information:")
-df.info()
-
-# ==========================================
-# 2. Data Quality & Statistics
-# ==========================================
-
-print("\nFinal Grade Statistics:")
-print(df["G3"].describe())
-
-print("\nMissing Values:")
-print(df.isnull().sum().sum())
-
-print("\nDuplicate Rows:")
-print(df.duplicated().sum())
-
-# Pass / Fail Statistics
-
-passed = (df["G3"] >= 10).sum()
-failed = (df["G3"] < 10).sum()
-
-print("\nPass/Fail Statistics:")
-print("Passed:", passed)
-print("Failed:", failed)
-
-# ==========================================
-# 3. Exploratory Data Analysis (EDA)
-# ==========================================
-
-# Study Time Analysis
-
-study_performance = df.groupby("studytime")["G3"].mean()
-
-print("\nAverage Grade by Study Time:")
-print(study_performance)
-
-# Absences Correlation
-
-correlation = df["absences"].corr(df["G3"])
-
-print("\nCorrelation between Absences and G3:")
-print(correlation)
-
-# Previous Failures Analysis
-
-failure_analysis = df.groupby("failures")["G3"].agg(
-    ["count", "mean", "median"]
-)
-
-print("\nFailure Analysis:")
-print(failure_analysis)
-
-# ==========================================
-# 4. Create Target Variable
-# ==========================================
-
-# 1 = Pass
-# 0 = Fail
-
-y = (df["G3"] >= 10).astype(int)
-
-# ==========================================
-# 5. Select Features
-# ==========================================
-
-# Remove G1, G2 and G3 to avoid grade leakage
-
-X = df.drop(columns=["G1", "G2", "G3"])
-
-# ==========================================
-# 6. Train-Test Split
-# ==========================================
-
-from sklearn.model_selection import train_test_split
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y
-)
-
-print("\nTraining and Testing Data:")
-print("X_train:", X_train.shape)
-print("X_test:", X_test.shape)
-print("y_train:", y_train.shape)
-print("y_test:", y_test.shape)
-
-print("\nTraining Target Distribution:")
-print(y_train.value_counts())
-
-print("\nTesting Target Distribution:")
-print(y_test.value_counts())
-
-# ==========================================
-# 7. Data Preprocessing
-# ==========================================
-
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
-numeric_features = X_train.select_dtypes(
-    include=["number"]
-).columns
-
-categorical_features = X_train.select_dtypes(
-    include=["object", "str", "category"]
-).columns
-
-print("\nNumerical Features:", len(numeric_features))
-print("Categorical Features:", len(categorical_features))
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ("num", StandardScaler(), numeric_features),
-        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features)
-    ]
-)
-
-X_train_processed = preprocessor.fit_transform(X_train)
-X_test_processed = preprocessor.transform(X_test)
-
-print("\nPreprocessing Results:")
-print("X_train_processed:", X_train_processed.shape)
-print("X_test_processed:", X_test_processed.shape)
-
-# ==========================================
-# 8. Baseline Model
-# ==========================================
-
-from sklearn.dummy import DummyClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    classification_report
-)
-
-baseline_model = DummyClassifier(strategy="most_frequent")
-
-baseline_model.fit(X_train_processed, y_train)
-
-y_pred_baseline = baseline_model.predict(X_test_processed)
-
-baseline_accuracy = accuracy_score(
-    y_test,
-    y_pred_baseline
-)
-
-print("\n========== BASELINE MODEL ==========")
-print("Accuracy:", baseline_accuracy)
-
-# ==========================================
-# 9. Logistic Regression
-# ==========================================
-
-from sklearn.linear_model import LogisticRegression
-
-logistic_model = LogisticRegression(
-    max_iter=1000,
-    random_state=42
-)
-
-logistic_model.fit(X_train_processed, y_train)
-
-y_pred_logistic = logistic_model.predict(X_test_processed)
-
-print("\n========== LOGISTIC REGRESSION ==========")
-
-print("Accuracy:",
-      accuracy_score(y_test, y_pred_logistic))
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred_logistic))
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred_logistic))
-
-# ==========================================
-# 10. Balanced Logistic Regression
-# ==========================================
-
-balanced_model = LogisticRegression(
-    max_iter=1000,
-    class_weight="balanced",
-    random_state=42
-)
-
-balanced_model.fit(X_train_processed, y_train)
-
-y_pred_balanced = balanced_model.predict(X_test_processed)
-
-print("\n========== BALANCED LOGISTIC REGRESSION ==========")
-
-print("Accuracy:",
-      accuracy_score(y_test, y_pred_balanced))
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred_balanced))
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred_balanced))
-
-# ==========================================
-# 11. Decision Tree (Limited Depth)
-# ==========================================
-
-from sklearn.tree import DecisionTreeClassifier
-
-tree_model = DecisionTreeClassifier(
-    max_depth=4,
-    random_state=42
-)
-
-tree_model.fit(X_train_processed, y_train)
-
-y_pred_tree = tree_model.predict(X_test_processed)
-
-print("\n========== DECISION TREE ==========")
-
-print("Accuracy:",
-      accuracy_score(y_test, y_pred_tree))
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred_tree))
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred_tree))
-
-# Overfitting Check
-
-y_train_pred_tree = tree_model.predict(X_train_processed)
-
-train_accuracy = accuracy_score(
-    y_train,
-    y_train_pred_tree
-)
-
-test_accuracy = accuracy_score(
-    y_test,
-    y_pred_tree
-)
-
-print("\n========== OVERFITTING CHECK ==========")
-
-print("Training Accuracy:", train_accuracy)
-print("Testing Accuracy:", test_accuracy)
-
-print("Tree Depth:", tree_model.get_depth())
-print("Number of Leaves:", tree_model.get_n_leaves())
-
-# Feature Importance
-
-importances = tree_model.feature_importances_
-
-feature_names = preprocessor.get_feature_names_out()
-
-feature_importance_df = pd.DataFrame({
-    "Feature": feature_names,
-    "Importance": importances
-})
-
-feature_importance_df = feature_importance_df.sort_values(
-    by="Importance",
-    ascending=False
-)
-
-print("\n========== FEATURE IMPORTANCE ==========")
-print(feature_importance_df.head(10).to_string(index=False))
-
-# Cross-Validation
-
-# Comparing Models with Cross-Validation
-
-models = {
-    "Logistic Regression": LogisticRegression(
-        max_iter=1000,
-        random_state=42
-    ),
-
-    "Balanced Logistic Regression": LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",
-        random_state=42
-    ),
-
-    "Decision Tree": DecisionTreeClassifier(
-        max_depth=4,
-        random_state=42
-    )
-}
-
-print("\n========== MODEL COMPARISON ==========")
-
-from sklearn.model_selection import StratifiedKFold
-
-cv = StratifiedKFold(
-    n_splits=5,
-    shuffle=True,
-    random_state=42
-)
-
-# Detailed Model Evaluation with Cross-Validation
-
-from sklearn.model_selection import cross_validate
-
-scoring = {
-    "accuracy": "accuracy",
-    "precision": "precision",
-    "recall": "recall",
-    "f1": "f1"
-}
-
-print("\n========== DETAILED MODEL COMPARISON ==========")
-
-for name, model in models.items():
-
-    pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", model)
-    ])
-
-    results = cross_validate(
-        pipeline,
-        X_train,
-        y_train,
-        cv=cv,
-        scoring=scoring
-    )
-
-    print(f"\n{name}")
-
-    for metric in scoring:
-        scores = results[f"test_{metric}"]
-
-        print(
-            f"{metric.capitalize()}: "
-            f"{scores.mean():.4f}"
-        )
-
-cv = StratifiedKFold(
-    n_splits=5,
-    shuffle=True,
-    random_state=42
-)
-for name, model in models.items():
-
-    pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", model)
-    ])
-
-    scores = cross_val_score(
-        pipeline,
-        X_train,
-        y_train,
-        cv=cv,
-        scoring="accuracy"
-    )
-
-    print(f"\n{name}")
-    print("Fold Scores:", scores)
-    print("Mean Accuracy:", scores.mean())
-    print("Standard Deviation:", scores.std())
-
-from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score
-from sklearn.model_selection import cross_validate
-
-scoring_classes = {
-    "pass_recall": "recall",
-    "pass_precision": "precision",
-    "fail_recall": make_scorer(recall_score, pos_label=0, zero_division=0),
-    "fail_precision": make_scorer(precision_score, pos_label=0, zero_division=0),
-    "fail_f1": make_scorer(f1_score, pos_label=0, zero_division=0)
-}
-
-print("\n========== PASS / FAIL PERFORMANCE ==========")
-
-for name, model in models.items():
-
-    pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", model)
-    ])
-
-    results = cross_validate(
-        pipeline,
-        X_train,
-        y_train,
-        cv=cv,
-        scoring=scoring_classes
-    )
-
-    print(f"\n{name}")
-
-    for metric in scoring_classes:
-        print(
-            f"{metric}: "
-            f"{results['test_' + metric].mean():.4f}"
-        )    
-from sklearn.model_selection import cross_validate
-
-scoring = {
-    "precision_macro": "precision_macro",
-    "recall_macro": "recall_macro",
-    "f1_macro": "f1_macro"
-}
-
-print("\n========== MACRO METRICS COMPARISON ==========")
-
-for name, model in models.items():
-
-    pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", model)
-    ])
-
-    results = cross_validate(
-        pipeline,
-        X_train,
-        y_train,
-        cv=cv,
-        scoring=scoring
-    )
-
-    print(f"\n{name}")
-
-    for metric in scoring:
-        scores = results[f"test_{metric}"]
-
-        print(
-            f"{metric}: {scores.mean():.4f}"
-        )
-# ==========================================
-# 12. Visualize Decision Tree (Simplified)
-# ==========================================
 
 import matplotlib.pyplot as plt
-from sklearn.tree import plot_tree
-
-plt.figure(figsize=(12, 7))
-
-plot_tree(
-    tree_model,
-    max_depth=2,
-    filled=True,
-    feature_names=preprocessor.get_feature_names_out(),
-    class_names=["Fail", "Pass"],
-    rounded=True,
-    fontsize=8
-)
-
-plt.title("Decision Tree - First 2 Levels")
-
-plt.tight_layout()
-plt.show()
-
-plt.close()
-
-from sklearn.model_selection import cross_val_score
-
-print("\n========== HYPERPARAMETER TUNING ==========")
-
-depth_values = [2, 3, 4, 5, 6, 8]
-
-for depth in depth_values:
-
-    pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", DecisionTreeClassifier(
-            max_depth=depth,
-            random_state=42
-        ))
-    ])
-
-    scores = cross_val_score(
-        pipeline,
-        X_train,
-        y_train,
-        cv=cv,
-        scoring="accuracy"
-    )
-
-    print(
-        f"Depth: {depth} | "
-        f"Mean Accuracy: {scores.mean():.4f} | "
-        f"Std: {scores.std():.4f}"
-    )
-from sklearn.model_selection import GridSearchCV
-
-pipeline = Pipeline([
-    ("preprocessor", preprocessor),
-    ("model", DecisionTreeClassifier(random_state=42))
-])
-
-param_grid = {
-    "model__max_depth": [2, 3, 4, 5, 6, 8],
-    "model__min_samples_split": [2, 5, 10],
-    "model__min_samples_leaf": [1, 2, 4]
-}
-
-grid_search = GridSearchCV(
-    estimator=pipeline,
-    param_grid=param_grid,
-    cv=cv,
-    scoring="accuracy",
-    n_jobs=1
-)
-
-grid_search.fit(X_train, y_train)
-
-print("\n========== GRID SEARCH RESULTS ==========")
-
-print("Best Parameters:", grid_search.best_params_)
-print("Best CV Accuracy:", grid_search.best_score_)
-
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
     accuracy_score,
     classification_report,
-    confusion_matrix
+    confusion_matrix,
+    f1_score,
+    make_scorer,
+    precision_score,
+    recall_score,
 )
-
-# Get the best model
-best_model = grid_search.best_estimator_
-
-# Predict on test data
-y_pred = best_model.predict(X_test)
-
-# Evaluate final model
-print("\n========== FINAL MODEL EVALUATION ==========")
-
-print("Test Accuracy:", accuracy_score(y_test, y_pred))
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
-
-# Balanced Logistic Regression Final Evaluation
-
-balanced_model = Pipeline([
-    ("preprocessor", preprocessor),
-    ("model", LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",
-        random_state=42
-    ))
-])
-
-balanced_model.fit(X_train, y_train)
-
-balanced_pred = balanced_model.predict(X_test)
-
-print("\n========== BALANCED LOGISTIC TEST RESULTS ==========")
-
-print("Accuracy:", accuracy_score(y_test, balanced_pred))
-
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, balanced_pred))
-
-print("\nClassification Report:")
-print(classification_report(y_test, balanced_pred))
-
-print("\n========== ERROR ANALYSIS: DECISION TREE ==========")
-
-# پیش‌بینی مدل نهایی روی داده‌های تست
-tree_predictions = best_model.predict(X_test)
-
-# ساخت جدول برای مقایسه پیش‌بینی با واقعیت
-errors = X_test.copy()
-
-errors["Actual"] = y_test
-errors["Predicted"] = tree_predictions
-
-# جدا کردن پیش‌بینی‌های اشتباه
-wrong_predictions = errors[
-    errors["Actual"] != errors["Predicted"]
-].copy()
-
-# تبدیل اعداد به برچسب‌های قابل فهم
-wrong_predictions["Actual"] = wrong_predictions["Actual"].map({
-    0: "Fail",
-    1: "Pass"
-})
-
-wrong_predictions["Predicted"] = wrong_predictions["Predicted"].map({
-    0: "Fail",
-    1: "Pass"
-})
-
-print("Total Test Samples:", len(X_test))
-print("Total Wrong Predictions:", len(wrong_predictions))
-
-print("\nWrong Predictions Details:")
-
-print(
-    wrong_predictions[
-        ["Actual", "Predicted", "failures", "absences", "studytime"]
-    ].to_string()
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    cross_val_score,
+    cross_validate,
+    train_test_split,
 )
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 
-print("\nError Types:")
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+DATA_PATH = PROJECT_DIR / "data" / "student-mat.csv"
+FIGURES_DIR = PROJECT_DIR / "figures"
 
-print(
-    wrong_predictions.groupby(
-        ["Actual", "Predicted"]
-    ).size()
-)
+RANDOM_STATE = 42
+PASS_MARK = 10
+CLASS_NAMES = ["Fail", "Pass"]  # encoded as 0 and 1
+TREE_DEPTHS = [2, 3, 4, 5, 6, 8]
+# Scorer settings that treat "Fail" as the positive class
+FAIL_CLASS = {"pos_label": 0, "zero_division": 0}
 
-print("\n========== ERROR ANALYSIS: BALANCED LOGISTIC ==========")
+MAIN_COLOR = "#257de0"
+METRIC_COLORS = ["#257de0", "#f47230", "#00b894", "#f2a600"]
 
-# ساخت جدول پیش‌بینی‌ها
-balanced_errors = X_test.copy()
 
-balanced_errors["Actual"] = y_test
-balanced_errors["Predicted"] = balanced_pred
+def print_header(title):
+    print(f"\n========== {title} ==========")
 
-# جدا کردن پیش‌بینی‌های اشتباه
-wrong_balanced = balanced_errors[
-    balanced_errors["Actual"] != balanced_errors["Predicted"]
-].copy()
 
-print("Total Test Samples:", len(X_test))
-print("Total Wrong Predictions:", len(wrong_balanced))
+def save_figure(fig, filename):
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / filename, dpi=150)
 
-# نمایش جزئیات خطاها
-print("\nWrong Predictions Details:")
 
-print(
-    wrong_balanced[
-        ["Actual", "Predicted", "failures", "absences", "studytime"]
-    ].to_string()
-)
+# ----- Data exploration -----
+def describe_data(df):
+    print("First 5 Rows:")
+    print(df.head())
 
-# شمارش انواع خطا
-print("\nError Types:")
+    print("\nDataset Shape:")
+    print(df.shape)
 
-print(
-    wrong_balanced.groupby(
-        ["Actual", "Predicted"]
-    ).size()
-)
-print("\n========== FINAL MODEL COMPARISON ==========")
+    print("\nColumn Names:")
+    print(df.columns.tolist())
 
-final_results = {
-    "Model": [
-        "Logistic Regression",
-        "Balanced Logistic Regression",
-        "Tuned Decision Tree"
-    ],
+    print("\nDataset Information:")
+    df.info()
 
-    "Accuracy": [
-        0.6582,
-        0.5949,
-        0.6582
-    ],
+    print("\nFinal Grade Statistics:")
+    print(df["G3"].describe())
 
-    "Fail Recall": [
-        0.3462,
-        0.4615,
-        0.3462
-    ],
+    print("\nMissing Values:")
+    print(df.isnull().sum().sum())
 
-    "Fail Precision": [
-        0.4737,
-        0.4000,
-        0.4737
-    ],
+    print("\nDuplicate Rows:")
+    print(df.duplicated().sum())
 
-    "Fail F1": [
-        0.4000,
-        0.4300,
-        0.4000
-    ],
+    passed = (df["G3"] >= PASS_MARK).sum()
+    print("\nPass/Fail Statistics:")
+    print("Passed:", passed)
+    print("Failed:", len(df) - passed)
 
-    "Pass Recall": [
-        0.8113,
-        0.6604,
-        0.8113
-    ]
-}
 
-final_df = pd.DataFrame(final_results)
+def plot_mean_grade(summary, tick_labels, xlabel, title, filename):
+    """Bar chart of the mean final grade per group, with group sizes."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bars = ax.bar(tick_labels, summary["mean"], color=MAIN_COLOR, width=0.6)
+    ax.bar_label(
+        bars,
+        labels=[
+            f"{row['mean']:.2f}\n(n={row['count']:.0f})"
+            for _, row in summary.iterrows()
+        ],
+        padding=3,
+    )
+    ax.set(xlabel=xlabel, ylabel="Mean final grade (G3)", title=title)
+    ax.set_ylim(0, summary["mean"].max() * 1.2)
+    ax.spines[["top", "right"]].set_visible(False)
+    save_figure(fig, filename)
 
-print(final_df.to_string(index=False))
+
+def plot_absences(df, correlation):
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(df["absences"], df["G3"], color=MAIN_COLOR, alpha=0.5)
+    ax.set(
+        xlabel="Absences",
+        ylabel="Final grade (G3)",
+        title=f"Absences vs. Final Grade (r = {correlation:.3f})",
+    )
+    ax.spines[["top", "right"]].set_visible(False)
+    save_figure(fig, "absences_vs_grade.png")
+
+
+def explore_relationships(df):
+    study_summary = df.groupby("studytime")["G3"].agg(["count", "mean"])
+    print("\nAverage Grade by Study Time:")
+    print(study_summary["mean"].rename("G3"))
+
+    correlation = df["absences"].corr(df["G3"])
+    print("\nCorrelation between Absences and G3:")
+    print(correlation)
+
+    failure_summary = df.groupby("failures")["G3"].agg(
+        ["count", "mean", "median"]
+    )
+    print("\nFailure Analysis:")
+    print(failure_summary)
+
+    study_labels = {1: "< 2 h", 2: "2-5 h", 3: "5-10 h", 4: "> 10 h"}
+    plot_mean_grade(
+        study_summary,
+        [study_labels[level] for level in study_summary.index],
+        "Weekly study time",
+        "Final Grade by Study Time",
+        "grade_by_study_time.png",
+    )
+    plot_absences(df, correlation)
+    plot_mean_grade(
+        failure_summary,
+        failure_summary.index.astype(str),
+        "Previous class failures",
+        "Final Grade by Previous Failures",
+        "grade_by_failures.png",
+    )
+
+
+# ----- Preprocessing -----
+def build_preprocessor(X):
+    numeric_features = X.select_dtypes(include="number").columns
+    categorical_features = X.select_dtypes(exclude="number").columns
+
+    print("\nNumerical Features:", len(numeric_features))
+    print("Categorical Features:", len(categorical_features))
+
+    return ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), numeric_features),
+            (
+                "cat",
+                OneHotEncoder(handle_unknown="ignore"),
+                categorical_features,
+            ),
+        ]
+    )
+
+
+def build_pipeline(preprocessor, model):
+    return Pipeline([("preprocessor", preprocessor), ("model", model)])
+
+
+# ----- Models and evaluation -----
+def build_models():
+    return {
+        "Logistic Regression": LogisticRegression(
+            max_iter=1000, random_state=RANDOM_STATE
+        ),
+        "Balanced Logistic Regression": LogisticRegression(
+            max_iter=1000,
+            class_weight="balanced",
+            random_state=RANDOM_STATE,
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            max_depth=4, random_state=RANDOM_STATE
+        ),
+    }
+
+
+def print_evaluation(title, y_true, y_pred, accuracy_label="Accuracy"):
+    print_header(title)
+    print(f"{accuracy_label}:", accuracy_score(y_true, y_pred))
+
+    print("\nConfusion Matrix:")
+    print(confusion_matrix(y_true, y_pred))
+
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred))
+
+
+def report_feature_importance(tree, feature_names):
+    importance = pd.DataFrame(
+        {"Feature": feature_names, "Importance": tree.feature_importances_}
+    ).sort_values(by="Importance", ascending=False)
+    top_features = importance.head(10)
+
+    print_header("FEATURE IMPORTANCE")
+    print(top_features.to_string(index=False))
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    bars = ax.barh(
+        top_features["Feature"], top_features["Importance"], color=MAIN_COLOR
+    )
+    ax.bar_label(bars, fmt="%.3f", padding=3)
+    ax.invert_yaxis()
+    ax.set(
+        xlabel="Importance",
+        title=f"Top 10 Features - Decision Tree (depth {tree.get_depth()})",
+    )
+    ax.set_xlim(0, top_features["Importance"].max() * 1.15)
+    ax.spines[["top", "right"]].set_visible(False)
+    save_figure(fig, "feature_importance.png")
+
+
+def plot_decision_tree(tree, feature_names):
+    fig, ax = plt.subplots(figsize=(12, 7))
+    plot_tree(
+        tree,
+        max_depth=2,
+        filled=True,
+        feature_names=feature_names,
+        class_names=CLASS_NAMES,
+        rounded=True,
+        fontsize=8,
+        ax=ax,
+    )
+    ax.set_title("Decision Tree - First 2 Levels")
+    save_figure(fig, "decision_tree.png")
+
+
+def cross_validate_models(models, preprocessor, X, y, cv):
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "fail_recall": make_scorer(recall_score, **FAIL_CLASS),
+        "fail_precision": make_scorer(precision_score, **FAIL_CLASS),
+        "fail_f1": make_scorer(f1_score, **FAIL_CLASS),
+        "precision_macro": "precision_macro",
+        "recall_macro": "recall_macro",
+        "f1_macro": "f1_macro",
+    }
+    results = {
+        name: cross_validate(
+            build_pipeline(preprocessor, model),
+            X,
+            y,
+            cv=cv,
+            scoring=scoring,
+        )
+        for name, model in models.items()
+    }
+
+    print_header("DETAILED MODEL COMPARISON")
+    for name, scores in results.items():
+        print(f"\n{name}")
+        for metric in ["accuracy", "precision", "recall", "f1"]:
+            mean_score = scores[f"test_{metric}"].mean()
+            print(f"{metric.capitalize()}: {mean_score:.4f}")
+
+    for name, scores in results.items():
+        fold_scores = scores["test_accuracy"]
+        print(f"\n{name}")
+        print("Fold Scores:", fold_scores)
+        print("Mean Accuracy:", fold_scores.mean())
+        print("Standard Deviation:", fold_scores.std())
+
+    # Printed label -> scorer name. "Pass" is the positive class.
+    class_metrics = {
+        "pass_recall": "recall",
+        "pass_precision": "precision",
+        "fail_recall": "fail_recall",
+        "fail_precision": "fail_precision",
+        "fail_f1": "fail_f1",
+    }
+    print_header("PASS / FAIL PERFORMANCE")
+    for name, scores in results.items():
+        print(f"\n{name}")
+        for label, metric in class_metrics.items():
+            print(f"{label}: {scores[f'test_{metric}'].mean():.4f}")
+
+    print_header("MACRO METRICS COMPARISON")
+    for name, scores in results.items():
+        print(f"\n{name}")
+        for metric in ["precision_macro", "recall_macro", "f1_macro"]:
+            print(f"{metric}: {scores[f'test_{metric}'].mean():.4f}")
+
+
+def compare_tree_depths(preprocessor, X, y, cv):
+    print_header("HYPERPARAMETER TUNING")
+    for depth in TREE_DEPTHS:
+        tree = DecisionTreeClassifier(
+            max_depth=depth, random_state=RANDOM_STATE
+        )
+        scores = cross_val_score(
+            build_pipeline(preprocessor, tree),
+            X,
+            y,
+            cv=cv,
+            scoring="accuracy",
+        )
+        print(
+            f"Depth: {depth} | "
+            f"Mean Accuracy: {scores.mean():.4f} | "
+            f"Std: {scores.std():.4f}"
+        )
+
+
+def tune_decision_tree(preprocessor, X, y, cv):
+    pipeline = build_pipeline(
+        preprocessor, DecisionTreeClassifier(random_state=RANDOM_STATE)
+    )
+    param_grid = {
+        "model__max_depth": TREE_DEPTHS,
+        "model__min_samples_split": [2, 5, 10],
+        "model__min_samples_leaf": [1, 2, 4],
+    }
+    grid_search = GridSearchCV(
+        estimator=pipeline,
+        param_grid=param_grid,
+        cv=cv,
+        scoring="accuracy",
+        n_jobs=1,
+    )
+    grid_search.fit(X, y)
+
+    print_header("GRID SEARCH RESULTS")
+    print("Best Parameters:", grid_search.best_params_)
+    print("Best CV Accuracy:", grid_search.best_score_)
+
+    return grid_search.best_estimator_
+
+
+def analyze_errors(title, X_test, y_test, y_pred, use_class_names=False):
+    results = X_test.assign(Actual=y_test, Predicted=y_pred)
+    errors = results[results["Actual"] != results["Predicted"]]
+
+    if use_class_names:
+        names = dict(enumerate(CLASS_NAMES))
+        errors = errors.assign(
+            Actual=errors["Actual"].map(names),
+            Predicted=errors["Predicted"].map(names),
+        )
+
+    print_header(f"ERROR ANALYSIS: {title}")
+    print("Total Test Samples:", len(X_test))
+    print("Total Wrong Predictions:", len(errors))
+
+    print("\nWrong Predictions Details:")
+    columns = ["Actual", "Predicted", "failures", "absences", "studytime"]
+    print(errors[columns].to_string())
+
+    print("\nError Types:")
+    print(errors.groupby(["Actual", "Predicted"]).size())
+
+
+def plot_confusion_matrices(y_test, predictions):
+    fig, axes = plt.subplots(2, 2, figsize=(9, 8))
+    for ax, (name, y_pred) in zip(axes.flat, predictions.items()):
+        display = ConfusionMatrixDisplay.from_predictions(
+            y_test,
+            y_pred,
+            display_labels=CLASS_NAMES,
+            cmap="Blues",
+            colorbar=False,
+            ax=ax,
+        )
+        # Use one color scale so the four panels are comparable
+        display.im_.set_clim(0, len(y_test))
+        counts = display.confusion_matrix.flat
+        for count, text in zip(counts, display.text_.flat):
+            text.set_color("white" if count > len(y_test) / 2 else "black")
+        ax.set_title(name)
+    fig.suptitle("Confusion Matrices (Test Set)")
+    save_figure(fig, "confusion_matrices.png")
+
+
+def summarize_test_results(y_test, predictions):
+    rows = []
+    for name, y_pred in predictions.items():
+        rows.append(
+            {
+                "Model": name,
+                "Accuracy": accuracy_score(y_test, y_pred),
+                "Fail Recall": recall_score(y_test, y_pred, **FAIL_CLASS),
+                "Fail Precision": precision_score(
+                    y_test, y_pred, **FAIL_CLASS
+                ),
+                "Fail F1": f1_score(y_test, y_pred, **FAIL_CLASS),
+                "Pass Recall": recall_score(y_test, y_pred),
+            }
+        )
+    return pd.DataFrame(rows).set_index("Model")
+
+
+def plot_model_comparison(results):
+    metrics = ["Accuracy", "Fail Recall", "Fail Precision", "Fail F1"]
+    fig, ax = plt.subplots(figsize=(12, 6))
+    results[metrics].plot.bar(
+        ax=ax, color=METRIC_COLORS, width=0.8, edgecolor="white", rot=0
+    )
+    for bars in ax.containers:
+        ax.bar_label(bars, fmt="%.2f", padding=2, fontsize=8)
+    # Wrap long model names so the tick labels do not overlap
+    ax.set_xticklabels([name.replace(" ", "\n", 1) for name in results.index])
+    ax.set(xlabel="", ylabel="Score", title="Model Comparison (Test Set)")
+    ax.set_ylim(0, 1)
+    ax.legend(ncols=len(metrics), loc="upper center", frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    save_figure(fig, "model_comparison.png")
+
+
+def main():
+    FIGURES_DIR.mkdir(exist_ok=True)
+
+    df = pd.read_csv(DATA_PATH, sep=";")
+    describe_data(df)
+    explore_relationships(df)
+
+    # Target: 1 = pass, 0 = fail
+    y = (df["G3"] >= PASS_MARK).astype(int)
+    # Exclude all grade columns to avoid leakage
+    X = df.drop(columns=["G1", "G2", "G3"])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
+    )
+
+    print("\nTraining and Testing Data:")
+    print("X_train:", X_train.shape)
+    print("X_test:", X_test.shape)
+    print("y_train:", y_train.shape)
+    print("y_test:", y_test.shape)
+
+    print("\nTraining Target Distribution:")
+    print(y_train.value_counts())
+
+    print("\nTesting Target Distribution:")
+    print(y_test.value_counts())
+
+    preprocessor = build_preprocessor(X_train)
+    X_train_processed = preprocessor.fit_transform(X_train)
+    X_test_processed = preprocessor.transform(X_test)
+
+    print("\nPreprocessing Results:")
+    print("X_train_processed:", X_train_processed.shape)
+    print("X_test_processed:", X_test_processed.shape)
+
+    baseline = DummyClassifier(strategy="most_frequent")
+    baseline.fit(X_train_processed, y_train)
+    y_pred_baseline = baseline.predict(X_test_processed)
+
+    print_header("BASELINE MODEL")
+    print("Accuracy:", accuracy_score(y_test, y_pred_baseline))
+
+    models = build_models()
+    predictions = {}
+    for name, model in models.items():
+        model.fit(X_train_processed, y_train)
+        predictions[name] = model.predict(X_test_processed)
+        print_evaluation(name.upper(), y_test, predictions[name])
+
+    tree = models["Decision Tree"]
+    train_accuracy = accuracy_score(y_train, tree.predict(X_train_processed))
+
+    print_header("OVERFITTING CHECK")
+    print("Training Accuracy:", train_accuracy)
+    print(
+        "Testing Accuracy:",
+        accuracy_score(y_test, predictions["Decision Tree"]),
+    )
+    print("Tree Depth:", tree.get_depth())
+    print("Number of Leaves:", tree.get_n_leaves())
+
+    feature_names = preprocessor.get_feature_names_out()
+    report_feature_importance(tree, feature_names)
+    plot_decision_tree(tree, feature_names)
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cross_validate_models(models, preprocessor, X_train, y_train, cv)
+    compare_tree_depths(preprocessor, X_train, y_train, cv)
+    tuned_tree = tune_decision_tree(preprocessor, X_train, y_train, cv)
+
+    y_pred_tuned = tuned_tree.predict(X_test)
+    print_evaluation(
+        "FINAL MODEL EVALUATION",
+        y_test,
+        y_pred_tuned,
+        accuracy_label="Test Accuracy",
+    )
+
+    y_pred_balanced = predictions["Balanced Logistic Regression"]
+    analyze_errors(
+        "DECISION TREE", X_test, y_test, y_pred_tuned, use_class_names=True
+    )
+    analyze_errors("BALANCED LOGISTIC", X_test, y_test, y_pred_balanced)
+
+    final_predictions = {
+        "Dummy Baseline": y_pred_baseline,
+        "Logistic Regression": predictions["Logistic Regression"],
+        "Balanced Logistic Regression": y_pred_balanced,
+        "Tuned Decision Tree": y_pred_tuned,
+    }
+    test_results = summarize_test_results(y_test, final_predictions)
+
+    print_header("FINAL MODEL COMPARISON")
+    print(
+        test_results.drop(index="Dummy Baseline")
+        .round(4)
+        .reset_index()
+        .to_string(index=False)
+    )
+
+    plot_confusion_matrices(y_test, final_predictions)
+    plot_model_comparison(test_results)
+
+    print(f"\nFigures saved to: {FIGURES_DIR}")
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
