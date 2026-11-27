@@ -87,7 +87,7 @@ Special attention was given to recall for the Fail class because identifying stu
 |---|---:|---:|---:|---:|
 | Dummy Classifier (Baseline) | 67.09% | 0.00% | — | 0.00% |
 | Logistic Regression | 65.82% | 34.62% | 47.37% | 40.00% |
-| Balanced Logistic Regression | 59.49% | 46.15% | 40.00% | 43.00% |
+| Balanced Logistic Regression | 59.49% | 46.15% | 40.00% | 42.86% |
 | Tuned Decision Tree | 65.82% | 34.62% | 47.37% | 40.00% |
 
 The Dummy Classifier achieved 67.09% accuracy by predicting every student as Pass. However, it failed to identify any students who actually failed. This demonstrates why accuracy alone can be misleading when evaluating imbalanced classification problems.
@@ -96,7 +96,21 @@ The Balanced Logistic Regression model achieved the highest recall for the Fail 
 
 However, this improvement came with a lower overall accuracy and more false positive predictions.
 
-The Logistic Regression and Tuned Decision Tree models achieved identical predictions on the test set.
+The Logistic Regression and Tuned Decision Tree models produced the same confusion matrix, and therefore the same test metrics, although their predictions differ for 6 of the 79 test students.
+
+## Visualizations
+
+Running the script saves these figures to the `figures/` folder and displays them:
+
+| File | Content |
+|---|---|
+| `grade_by_study_time.png` | Mean final grade by weekly study time |
+| `absences_vs_grade.png` | Absences compared with final grade |
+| `grade_by_failures.png` | Mean final grade by number of previous failures |
+| `feature_importance.png` | Top 10 features of the Decision Tree (depth 4) |
+| `decision_tree.png` | First two levels of the Decision Tree (depth 4) |
+| `confusion_matrices.png` | Test set confusion matrices of the compared models |
+| `model_comparison.png` | Test set accuracy and Fail-class metrics |
 
 ## Limitations
 
@@ -121,6 +135,7 @@ The Logistic Regression and Tuned Decision Tree models achieved identical predic
 student-performance-analysis/
 ├── data/
 │   └── student-mat.csv
+├── figures/              # created by the script
 ├── notebooks/
 │   ├── student_analysis.ipynb
 │   └── test.py
