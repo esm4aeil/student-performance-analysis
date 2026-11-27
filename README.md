@@ -137,7 +137,6 @@ student-performance-analysis/
 │   └── student-mat.csv
 ├── figures/              # created by the script
 ├── notebooks/
-│   ├── student_analysis.ipynb
 │   └── test.py
 ├── README.md
 ├── requirements.txt
